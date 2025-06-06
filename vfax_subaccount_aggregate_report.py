@@ -10,6 +10,45 @@ import pymysql
 
 import csv
 
+
+
+
+# Configuration
+ELASTICSEARCH_URL = "https://elasticsearch.proxy.infra.vitel.net"  # Change this if your ES runs elsewhere
+SQL_ENDPOINT = f"{ELASTICSEARCH_URL}/_sql"
+HEADERS = {"Content-Type": "application/json"}
+SQL_DATE_FIELD = "createDt"
+
+index = 'data02-vitel-cdrs-2025-05'
+START_DATE = os.environ.get("START_DATE")
+END_DATE = os.environ.get("END_DATE")
+fax_limiter = "in ('INBOUND_FAX_USAGE','OUTBOUND_FAX_USAGE')"
+tf_limiter = "in ('OUTBOUND_TF_USAGE', 'INBOUND_TF_USAGE')"
+standard_limiter = "in ('INBOUND_USAGE', 'OUTBOUND_USAGE')"
+
+customer = os.environ.get('customer')
+
+if os.environ.get("split_std_usage") == "true":
+    split_std_usage = True
+else:
+    split_std_usage = False
+
+if os.environ.get('subaccount'):
+    relevant_subaccount = os.environ.get('subaccount')
+else:
+    relevant_subaccount = None
+# MySQL connection configuration
+MYSQL_CONFIG = {
+    'user': 'readonly',
+    'password': 'H1ssy.f1t!',
+    'host': 'ha.proxy.infra.vitel.net',
+    'database': 'vitel'
+}
+
+postgres_host = "10.44.8.11"
+postgres_user = "vitel_user"
+postgres_password = "rG2ZcAdazsQBzHbB"
+
 output_filename = 'aggregate_report_'+os.environ.get('customer') + '.csv'
 
 def write_aggregate_report_csv(start_date, end_date, mrc_data_dict, non_fax_es_data_dict, es_fax_data_dict, filename=output_filename):
@@ -59,37 +98,6 @@ def write_aggregate_report_csv(start_date, end_date, mrc_data_dict, non_fax_es_d
                     'productCode': data.get('productCode', '')
                 }
                 writer.writerow(row)
-
-# Configuration
-ELASTICSEARCH_URL = "https://elasticsearch.proxy.infra.vitel.net"  # Change this if your ES runs elsewhere
-SQL_ENDPOINT = f"{ELASTICSEARCH_URL}/_sql"
-HEADERS = {"Content-Type": "application/json"}
-SQL_DATE_FIELD = "createDt"
-
-index = 'data02-vitel-cdrs-2025-05'
-START_DATE = '2025-05-01'
-END_DATE = '2025-05-31'
-fax_limiter = "in ('INBOUND_FAX_USAGE','OUTBOUND_FAX_USAGE')"
-tf_limiter = "in ('OUTBOUND_TF_USAGE', 'INBOUND_TF_USAGE')"
-standard_limiter = "in ('INBOUND_USAGE', 'OUTBOUND_USAGE')"
-
-
-customer = os.environ.get('customer')
-if os.environ.get('subaccount'):
-    relevant_subaccount = os.environ.get('subaccount')
-else:
-    relevant_subaccount = None
-# MySQL connection configuration
-MYSQL_CONFIG = {
-    'user': 'readonly',
-    'password': 'H1ssy.f1t!',
-    'host': 'ha.proxy.infra.vitel.net',
-    'database': 'vitel'
-}
-
-postgres_host = "10.44.8.11"
-postgres_user = "vitel_user"
-postgres_password = "rG2ZcAdazsQBzHbB"
 
 def query_efaxauth(account, subaccount=None):
     subaccount = relevant_subaccount if subaccount is None else subaccount
@@ -198,8 +206,12 @@ print("Querying for efaxauth")
 efaxauth_data = query_efaxauth(customer)
 
 print("Querying ES for non-fax data")
-sql_base_standard = (f'SELECT subaccount, sum(dollarAmount), sum(duration) FROM "{index}" where createDt between \'{START_DATE}T00:00:00.000\' and \'{END_DATE}T23:59:59.999\' '
-            f'and accountcode = \'{customer}\' and productCode not {fax_limiter} group by subaccount')
+if split_std_usage == True:
+    standard_grouping = ", productCode"
+else:
+    standard_grouping = ""
+sql_base_standard = (f'SELECT subaccount, sum(dollarAmount), sum(duration) {standard_grouping} FROM "{index}" where createDt between \'{START_DATE}T00:00:00.000\' and \'{END_DATE}T23:59:59.999\' '
+            f'and accountcode = \'{customer}\' and productCode not {fax_limiter} group by subaccount'+ standard_grouping)
 
 non_fax_es_data = query_elasticsearch_with_sql(sql_base_standard)
 #Put the non_fax_data into a dict with subaccount as key
