@@ -10,7 +10,9 @@ import pymysql
 
 import csv
 
-def write_aggregate_report_csv(start_date, end_date, mrc_data_dict, non_fax_es_data_dict, es_fax_data_dict, filename='aggregate_report.csv'):
+output_filename = 'aggregate_report_'+os.environ.get('customer') + '.csv'
+
+def write_aggregate_report_csv(start_date, end_date, mrc_data_dict, non_fax_es_data_dict, es_fax_data_dict, filename=output_filename):
     all_subaccounts = set(mrc_data_dict.keys()) | set(non_fax_es_data_dict.keys()) | set(es_fax_data_dict.keys())
     columns = ['accountcode', 'subaccount', 'dollarAmount', 'duration', 'productCode']
 
