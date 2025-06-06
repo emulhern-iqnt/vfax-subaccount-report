@@ -20,7 +20,7 @@ def write_aggregate_report_csv(start_date, end_date, mrc_data_dict, non_fax_es_d
     sorted_subaccounts = sorted(all_subaccounts)
     with open(filename, 'w', newline='') as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=columns)
-        title = f"Report for {start_date} to {end_date}" if start_date and end_date else ""
+        title = f"Subaccount Breakdown Report for {start_date} to {end_date}: {os.environ.get('customer')}" if start_date and end_date else ""
         writer.writerow({columns[0]: title})
         writer.writeheader()
 
