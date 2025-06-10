@@ -56,6 +56,7 @@ def write_aggregate_report_csv(start_date, end_date, mrc_data_dict, non_fax_es_d
     columns = ['accountcode', 'subaccount', 'dollarAmount', 'duration', 'productCode']
 
     sorted_fax_data_dict = dict(sorted(es_fax_data_dict.items()))
+    sorted_non_fax_data_dict = dict(sorted(non_fax_es_data_dict.items()))
     sorted_subaccounts = sorted(all_subaccounts)
     with open(filename, 'w', newline='') as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=columns)
@@ -79,14 +80,15 @@ def write_aggregate_report_csv(start_date, end_date, mrc_data_dict, non_fax_es_d
             # Write from non_fax_es_data_dict if present
             if subaccount in non_fax_es_data_dict:
                 data = non_fax_es_data_dict[subaccount]
-                row = {
-                    'accountcode': data.get('accountcode', ''),
+                for row in data:
+                    row_to_write = {
+                    'accountcode': row['accountcode'],
                     'subaccount': subaccount,
-                    'dollarAmount': "{:.2f}".format(float(data.get('dollarAmount', 0))) if data.get('dollarAmount') not in (None, '') else '',
-                    'duration': str(int(round(float(data.get('duration', 0))))) if data.get('duration') not in (None, '') else '',
-                    'productCode': data.get('productCode', '')
-                }
-                writer.writerow(row)
+                    'dollarAmount': "{:.2f}".format(float(row.get('dollarAmount', 0))) if row.get('dollarAmount') not in (None, '') else '',
+                    'duration': str(int(round(float(row.get('duration', 0))))) if row.get('duration') not in (None, '') else '',
+                    'productCode': row['productCode']
+                    }
+                    writer.writerow(row_to_write)
             # Write from mrc_data_dict if present
             if subaccount in mrc_data_dict:
                 data = mrc_data_dict[subaccount]
@@ -216,17 +218,35 @@ sql_base_standard = (f'SELECT subaccount, sum(dollarAmount), sum(duration) {stan
 non_fax_es_data = query_elasticsearch_with_sql(sql_base_standard)
 #Put the non_fax_data into a dict with subaccount as key
 non_fax_es_data_dict = {}
+
 for row in non_fax_es_data['rows']:
     subaccount = row[0]
+    #non_fax_es_data_dict[subaccount] = []
     dollar_amount = row[1]
     duration = row[2]
-    non_fax_es_data_dict[subaccount] = {
-        'accountcode': customer,
-        'subaccount': subaccount,
-        'dollarAmount': dollar_amount,
-        'duration': duration,
-        'productCode': 'STANDARD_USAGE'  # Assuming a generic product code for non-fax usage
-    }
+    if standard_grouping != "" and len(row) > 3:
+        #should get it in the same form as es_fax_data_dict
+        productCode = row[3]
+        dict_to_append = {
+            'accountcode': customer,
+            'subaccount': subaccount,
+            'dollarAmount': dollar_amount,
+            'duration': duration,
+            'productCode': productCode  # Assuming a generic product code for non-fax usage
+        }
+    else:
+        productCode = 'STANDARD_USAGE'
+        dict_to_append = {
+            'accountcode': customer,
+            'subaccount': subaccount,
+            'dollarAmount': dollar_amount,
+            'duration': duration,
+            'productCode': productCode  # Assuming a generic product code for non-fax usage
+        }
+    if subaccount not in non_fax_es_data_dict:
+        non_fax_es_data_dict[subaccount]= [dict_to_append]
+    else:
+        non_fax_es_data_dict[subaccount].append(dict_to_append)
 
 print("Querying ES for fax data")
 es_fax_data_dict = {}
