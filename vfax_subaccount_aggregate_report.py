@@ -10,6 +10,7 @@ import pymysql
 
 import csv
 
+from Mailgun import send_with_attach
 
 
 
@@ -49,7 +50,7 @@ postgres_host = "10.44.8.11"
 postgres_user = "vitel_user"
 postgres_password = "rG2ZcAdazsQBzHbB"
 
-output_filename = 'aggregate_report_'+os.environ.get('customer') + '.csv'
+output_filename = os.path.join('/tmp', 'aggregate_report_' + os.environ.get('customer') + '.csv')
 
 def write_aggregate_report_csv(start_date, end_date, mrc_data_dict, non_fax_es_data_dict, es_fax_data_dict, filename=output_filename):
     all_subaccounts = set(mrc_data_dict.keys()) | set(non_fax_es_data_dict.keys()) | set(es_fax_data_dict.keys())
@@ -284,6 +285,14 @@ print("Non-fax ES Data on [%s] subaccounts" % len(non_fax_es_data_dict))
 print("Fax ES Data on [%s] subaccounts" % len(es_fax_data_dict))
 
 write_aggregate_report_csv(START_DATE, END_DATE, mrc_data_dict, non_fax_es_data_dict, es_fax_data_dict)
+
+#api_url = os.environ.get('MAILGUN_API_URL')
+#sender = os.environ.get('MAILGUN_SENDER')
+#recipient = os.environ.get('MAILGUN_RECIPIENT')
+#subject = f"Aggregate Report for {customer}"
+#body = f"Attached is the aggregate report for {customer} from {START_DATE} to {END_DATE}."
+
+#send_with_attach(api_url, sender, recipient, subject, body, output_filename)
 
 end_time = time.time()
 total_time = end_time - start_time
